@@ -1,0 +1,10 @@
+# 5shot
+
+python certify.py ../../raid/data/datasets/birds200/all_images ../../raid/data/datasets/birds200/split ../../raid/data/okuznetsova/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/cub200/5shot/N1000/sigma1.0_a0.01.txt 5 --max 20 --N 1000 --K 10 --alpha 0.01 --cuda_number 0
+python certify.py ../../raid/data/datasets/birds200/all_images ../../raid/data/datasets/birds200/split ../../raid/data/okuznetsova/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/cub200/5shot/N1000/sigma1.0_a0.0001.txt 5 --max 20 --N 1000 --K 10 --alpha 0.0001 --cuda_number 0
+
+# python certify.py ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits ../../raid/data/okuznetsova/cifar-fs/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/cifar-fs/5shot/N1000/sigma1.0_a0.01.txt 5 --max 20 --N 1000 --K 10 --alpha 0.01 --dataset cifar-fs --cuda_number 2 --manual_seed 42
+# python certify.py ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits ../../raid/data/okuznetsova/cifar-fs/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/cifar-fs/5shot/N1000/sigma1.0_a0.0001.txt 5 --max 20 --N 1000 --K 10 --alpha 0.0001 --dataset cifar-fs --cuda_number 2 --manual_seed 42
+
+# python certify.py ../../raid/data/datasets/miniimagenet/miniimagenet/data ../../raid/data/datasets/miniimagenet/miniimagenet/splits/ravi-larochelle ../../raid/data/okuznetsova/mini-imagenet/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/mini-imagenet/5shot/N1000/sigma1.0_a0.01.txt 5 --max 20 --N 1000 --K 10 --alpha 0.01 --dataset mini-imagenet --cuda_number 2
+# python certify.py ../../raid/data/datasets/miniimagenet/miniimagenet/data ../../raid/data/datasets/miniimagenet/miniimagenet/splits/ravi-larochelle ../../raid/data/okuznetsova/mini-imagenet/protonet_5shot_normalize_512_augment_1 1.0 ../data/certify/mini-imagenet/5shot/N1000/sigma1.0_a0.0001.txt 5 --max 20 --N 1000 --K 10 --alpha 0.0001 --dataset mini-imagenet --cuda_number 2

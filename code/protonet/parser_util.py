@@ -5,10 +5,20 @@ import argparse
 
 def get_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset',
+                        type=str,
+                        help='"cub", "mini-imagenet" or "cifar-fs"',
+                        default='cub')
+
     parser.add_argument('-root', '--dataset_root',
                         type=str,
                         help='path to dataset',
                         default='..' + os.sep + 'dataset')
+    
+    parser.add_argument('--splits_root',
+                        type=str,
+                        help='path to dataset splits files',
+                        default='..' + os.sep + 'splits')
 
     parser.add_argument('-exp', '--experiment_root',
                         type=str,
@@ -78,5 +88,26 @@ def get_parser():
     parser.add_argument('--cuda',
                         action='store_true',
                         help='enables cuda')
+    
+    parser.add_argument('-cudanum', '--cuda_number',
+                        help='number of cuda',
+                        default=0)
+    
+    parser.add_argument('-imsize', '--orig_imsize',
+                        type=int,
+                        help='-1 for no cache, and -2 for no resize, only for MiniImageNet',
+                        default=-1)
+    
+    parser.add_argument( '--smooth_samples',
+                        type=int,
+                        help='-1 for no smoothing on train, positive interger otherwise',
+                        default=-1)
+    
+    parser.add_argument( '--sigma_train',
+                        type=float,
+                        help='-1 for no smoothing on train, positive float otherwise',
+                        default=-1)
+    
+
 
     return parser

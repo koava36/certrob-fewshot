@@ -1,15 +1,18 @@
 # coding=utf-8
 from prototypical_batch_sampler import PrototypicalBatchSampler
 from prototypical_loss import prototypical_loss as loss_fn
-from omniglot_dataset import OmniglotDataset
-from protonet import ProtoNet
+from datasets import CUB, MiniImageNet, CifarFS
+from model import ProtoNet
 from parser_util import get_parser
+import warnings
 
 from tqdm import tqdm
 import numpy as np
 import torch
-import os
+import os, sys
 
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
 
 def init_seed(opt):
     '''
@@ -22,8 +25,13 @@ def init_seed(opt):
 
 
 def init_dataset(opt, mode):
-    dataset = OmniglotDataset(mode=mode, root=opt.dataset_root)
-    n_classes = len(np.unique(dataset.y))
+    if opt.dataset == 'cub':
+        dataset = CUB(setname=mode, args=opt, augment=True)
+    elif opt.dataset == 'mini-imagenet':
+        dataset = MiniImageNet(setname=mode, args=opt, augment=True)
+    elif opt.dataset == 'cifar-fs':
+        dataset = CifarFS(setname=mode, args=opt, augment=True)
+    n_classes = dataset.num_class
     if n_classes < opt.classes_per_it_tr or n_classes < opt.classes_per_it_val:
         raise(Exception('There are not enough classes in the dataset in order ' +
                         'to satisfy the chosen classes_per_it. Decrease the ' +
@@ -47,7 +55,7 @@ def init_sampler(opt, labels, mode):
 
 def init_dataloader(opt, mode):
     dataset = init_dataset(opt, mode)
-    sampler = init_sampler(opt, dataset.y, mode)
+    sampler = init_sampler(opt, dataset.label, mode)
     dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=sampler)
     return dataloader
 
@@ -56,7 +64,8 @@ def init_protonet(opt):
     '''
     Initialize the ProtoNet
     '''
-    device = 'cuda:0' if torch.cuda.is_available() and opt.cuda else 'cpu'
+    device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
+    print('DEVICE: ', device)
     model = ProtoNet().to(device)
     return model
 
@@ -89,7 +98,7 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
     Train the model with the prototypical learning algorithm
     '''
 
-    device = 'cuda:0' if torch.cuda.is_available() and opt.cuda else 'cpu'
+    device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
 
     if val_dataloader is None:
         best_state = None
@@ -110,13 +119,22 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
             optim.zero_grad()
             x, y = batch
             x, y = x.to(device), y.to(device)
+            
+            if opt.smooth_samples != -1:
+                x = x.repeat(opt.smooth_samples, 1, 1, 1)
+                x = x + torch.randn_like(x) * opt.sigma_train
+                
             model_output = model(x)
+            
+            if opt.smooth_samples != -1:
+                model_output = model_output.reshape(opt.smooth_samples, y.shape[0], model_output.shape[-1]).mean(dim=0)
+                
             loss, acc = loss_fn(model_output, target=y,
                                 n_support=opt.num_support_tr)
             loss.backward()
             optim.step()
-            train_loss.append(loss.item())
-            train_acc.append(acc.item())
+            train_loss.append(loss.cpu().item())
+            train_acc.append(acc.cpu().item())
         avg_loss = np.mean(train_loss[-opt.iterations:])
         avg_acc = np.mean(train_acc[-opt.iterations:])
         print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
@@ -137,6 +155,7 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
         avg_acc = np.mean(val_acc[-opt.iterations:])
         postfix = ' (Best)' if avg_acc >= best_acc else ' (Best: {})'.format(
             best_acc)
+        #wandb.log({'val acc': avg_acc, 'val loss': avg_loss})
         print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(
             avg_loss, avg_acc, postfix))
         if avg_acc >= best_acc:
@@ -153,18 +172,19 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
     return best_state, best_acc, train_loss, train_acc, val_loss, val_acc
 
 
-def test(opt, test_dataloader, model):
+def test(opt, test_dataloader, model, smooth=False):
     '''
     Test the model trained with the prototypical learning algorithm
     '''
-    device = 'cuda:0' if torch.cuda.is_available() and opt.cuda else 'cpu'
+    device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
     avg_acc = list()
     for epoch in range(10):
         test_iter = iter(test_dataloader)
-        for batch in test_iter:
+        for batch in tqdm(test_iter):
             x, y = batch
             x, y = x.to(device), y.to(device)
             model_output = model(x)
+                
             _, acc = loss_fn(model_output, target=y,
                              n_support=opt.num_support_val)
             avg_acc.append(acc.item())
@@ -195,6 +215,7 @@ def eval(opt):
 
 
 def main():
+    
     '''
     Initialize everything and train
     '''

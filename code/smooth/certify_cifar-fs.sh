@@ -1,0 +1,5 @@
+# 1shot
+
+python certify.py ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits ../../raid/data/okuznetsova/cifar-fs/protonet_1shot_normalize_512_augment_1 1.0 ../data/certify/cifar-fs/1shot/N1000_sigma1.0_a0.001.txt 1 --max 10 --N 1000 --K 10 --alpha 0.001 --dataset cifar-fs --cuda_number 4 --manual_seed 42
+python certify.py ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits ../../raid/data/okuznetsova/cifar-fs/protonet_1shot_normalize_512_augment_1 1.0 ../data/certify/cifar-fs/1shot/N5000_sigma1.0_a0.001.txt 1 --max 10 --N 5000 --K 10 --alpha 0.001 --dataset cifar-fs --cuda_number 4 --manual_seed 42
+python certify.py ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs ../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits ../../raid/data/okuznetsova/cifar-fs/protonet_1shot_normalize_512_augment_1 1.0 ../data/certify/cifar-fs/1shot/N3000_sigma1.0_a0.001.txt 1 --max 10 --N 3000 --K 10 --alpha 0.001 --dataset cifar-fs --cuda_number 4 --manual_seed 42
