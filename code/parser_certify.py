@@ -8,8 +8,8 @@ def get_parser():
 
     parser.add_argument('dataset',
                         type=str,
-                        default='cub',
-                        help='"cub", "mini-imagenet" or "cifar-fs"')
+                        default='cub200',
+                        help='"cub200", "mini-imagenet" or "cifar-fs"')
     
     parser.add_argument("dataset_root",
                         type=str,

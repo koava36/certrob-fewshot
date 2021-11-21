@@ -1,3 +1,2 @@
 numpy
-statsmodels
 torch

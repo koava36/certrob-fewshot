@@ -35,8 +35,7 @@ class Smooth(object):
             return abs(deltas * self.sigma * np.sqrt(pi / 2))
         
     
-    def predict(self, x: torch.tensor, centroids: torch.tensor, centroid_classes: torch.tensor, alpha: float,
-                m_values: int, k_repeats: int, n_samples: int, batch_size: int, show_bounds=False):
+    def predict(self, args, x: torch.tensor, centroids: torch.tensor, centroid_classes: torch.tensor, show_bounds=False):
         """Define predicted by smoothed model class and adversarial class on sample x"""
         
         """
@@ -45,7 +44,7 @@ class Smooth(object):
         
         alpha = args.alpha
         m_values = args.M
-        k_repearts = args.K
+        k_repeats = args.K
         n_samples = args.N
         batch_size = args.batch
 #         def s_realizations(a, N):

@@ -25,7 +25,7 @@ def init_seed(opt):
 
 
 def init_dataset(opt, mode):
-    if opt.dataset == 'cub':
+    if opt.dataset == 'cub200':
         dataset = CUB(setname=mode, args=opt, augment=True)
     elif opt.dataset == 'mini-imagenet':
         dataset = MiniImageNet(setname=mode, args=opt, augment=True)
@@ -65,7 +65,6 @@ def init_protonet(opt):
     Initialize the ProtoNet
     '''
     device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
-    print('DEVICE: ', device)
     model = ProtoNet().to(device)
     return model
 

@@ -1,1 +1,0 @@
-python certify.py ../../raid/data/datasets/birds200/all_images ../../raid/data/datasets/birds200/split ../../raid/data/okuznetsova/protonet_1shot_normalize_512_augment_1 1.0 ../data/certify/cub200/1shot/N3000/sigma1.0_a0.001.txt 1 --max 10 --N 3000 --K 10 --alpha 0.001 --cuda_number 2
