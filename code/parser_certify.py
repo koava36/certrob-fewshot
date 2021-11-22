@@ -23,10 +23,6 @@ def get_parser():
                         type=str,
                         help="path to saved pytorch model of base classifier")
     
-    parser.add_argument("sigma",
-                        type=float,
-                        help="noise hyperparameter for smoothing")
-    
     parser.add_argument("outfile",
                         type=str,
                         help="output file for experiment data")
@@ -34,7 +30,11 @@ def get_parser():
     parser.add_argument("num_support_val",
                         type=int,
                         help="number of support samples")
-    
+
+    parser.add_argument("sigma",
+                        type=float,
+                        help="noise hyperparameter for smoothing")
+        
     parser.add_argument("--num_query_val",
                         type=int,
                         default=5,
