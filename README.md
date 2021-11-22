@@ -36,3 +36,4 @@ python certify.py mini-imagenet PATH_TO_IMAGES PATH_TO_SPLITS PATH_TO_CHECKPOINT
 python certify.py mini-imagenet PATH_TO_IMAGES PATH_TO_SPLITS PATH_TO_CHECKPOINT ../data/certify/mini-imagenet/1shot/N1000/sigma1.0_a0.01.txt 1 1.0 --max 20 --N 1000 --K 10 --alpha 0.01
 python certify.py mini-imagenet PATH_TO_IMAGES PATH_TO_SPLITS PATH_TO_CHECKPOINT ../data/certify/mini-imagenet/1shot/N1000/sigma1.0_a0.0001.txt 1 1.0 --max 20 --N 1000 --K 10 --alpha 0.0001
 ```
+To visualize the results just run code/visualize.py
