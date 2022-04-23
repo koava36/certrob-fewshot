@@ -30,6 +30,11 @@ def get_parser():
                         help='number of epochs to train for',
                         default=100)
 
+    parser.add_argument( '--sigma',
+                        type=float,
+                        help='augmentation standard deviation',
+                        default=1.0)
+    
     parser.add_argument('-lr', '--learning_rate',
                         type=float,
                         help='learning rate for the model, default=0.001',
@@ -98,15 +103,6 @@ def get_parser():
                         help='-1 for no cache, and -2 for no resize, only for MiniImageNet',
                         default=-1)
     
-    parser.add_argument( '--smooth_samples',
-                        type=int,
-                        help='-1 for no smoothing on train, positive interger otherwise',
-                        default=-1)
-    
-    parser.add_argument( '--sigma_train',
-                        type=float,
-                        help='-1 for no smoothing on train, positive float otherwise',
-                        default=-1)
     
 
 

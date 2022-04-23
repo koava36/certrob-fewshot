@@ -72,13 +72,13 @@ class CUB(Dataset):
         # Transformation
         if setname == 'train' and augment: 
             self.transform = transforms.Compose(
-                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., 1.)], p=0.3),
-                                   transforms.Normalize(np.array([0.485, 0.456, 0.406]),
-                                                        np.array([0.229, 0.224, 0.225]))]
+                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., args.sigma)], p=0.3),
+                                   transforms.Normalize(np.array([104 / 255.0, 117 / 255.0, 128 / 255.0]),
+                                                        np.array([1.0/255, 1.0/255, 1.0/255]))]
             )
         else:
-            self.transform = transforms.Compose(transforms_list + [transforms.Normalize(np.array([0.485, 0.456, 0.406]),
-                                                                                        np.array([0.229, 0.224, 0.225]))])
+            self.transform = transforms.Compose(transforms_list + [transforms.Normalize(np.array([104 / 255.0, 117 / 255.0, 128 / 255.0]),
+                                                                                        np.array([1.0/255, 1.0/255, 1.0/255]))])
         
                      
     def parse_csv(self, txt_path):
@@ -166,7 +166,7 @@ class MiniImageNet(Dataset):
         # Transformation
         if setname == 'train' and augment: 
             self.transform = transforms.Compose(
-                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., 1.)], p=0.3),
+                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., args.sigma)], p=0.3),
                                    transforms.Normalize(np.array([0.485, 0.456, 0.406]),
                                                         np.array([0.229, 0.224, 0.225]))]
             )
@@ -210,7 +210,7 @@ class MiniImageNet(Dataset):
 class CifarFS(Dataset):
 
     def __init__(self, setname, args, augment=False):
-        
+
 #         if dataset_dir is None:
 #             self.IMAGE_PATH =  '../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs'
 #             self.SPLIT_PATH = '../../raid/data/datasets/cifar100/cifar-100-python/cifar-fs-splits'
@@ -259,13 +259,13 @@ class CifarFS(Dataset):
         # Transformation
         if setname == 'train' and augment: 
             self.transform = transforms.Compose(
-                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., 1.)], p=0.3),
-                                   transforms.Normalize(np.array([0.485, 0.456, 0.406]),
-                                                        np.array([0.229, 0.224, 0.225]))]
+                transforms_list + [transforms.RandomApply([AddGaussianNoise(0., args.sigma)], p=0.3),
+                                   transforms.Normalize(np.array([0.4914, 0.4822, 0.4465]),
+                                                        np.array([0.2023, 0.1994, 0.2010]))]
             )
         else:
-            self.transform = transforms.Compose(transforms_list + [transforms.Normalize(np.array([0.485, 0.456, 0.406]),
-                                                                                        np.array([0.229, 0.224, 0.225]))])
+            self.transform = transforms.Compose(transforms_list + [transforms.Normalize(np.array([0.4914, 0.4822, 0.4465]),
+                                                                                        np.array([0.2023, 0.1994, 0.2010]))])
             #self.transform = transforms.Compose(transforms_list)
                      
     
@@ -303,6 +303,6 @@ class CifarFS(Dataset):
         return image, label 
 
     
-    
+
 def identity(x):
     return x

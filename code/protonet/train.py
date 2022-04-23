@@ -2,7 +2,7 @@
 from prototypical_batch_sampler import PrototypicalBatchSampler
 from prototypical_loss import prototypical_loss as loss_fn
 from datasets import CUB, MiniImageNet, CifarFS
-from model import ProtoNet
+from model import ProtoNetEmbedding
 from parser_util import get_parser
 import warnings
 
@@ -11,8 +11,11 @@ import numpy as np
 import torch
 import os, sys
 
+from torch.utils.tensorboard import SummaryWriter
+
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
+
 
 def init_seed(opt):
     '''
@@ -65,7 +68,7 @@ def init_protonet(opt):
     Initialize the ProtoNet
     '''
     device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
-    model = ProtoNet().to(device)
+    model = ProtoNetEmbedding().to(device)
     return model
 
 
@@ -92,7 +95,7 @@ def save_list_to_file(path, thelist):
             f.write("%s\n" % item)
 
 
-def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
+def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None, writer=None):
     '''
     Train the model with the prototypical learning algorithm
     '''
@@ -118,16 +121,16 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
             optim.zero_grad()
             x, y = batch
             x, y = x.to(device), y.to(device)
-            
-            if opt.smooth_samples != -1:
-                x = x.repeat(opt.smooth_samples, 1, 1, 1)
-                x = x + torch.randn_like(x) * opt.sigma_train
-                
+
+#             if opt.smooth_samples != -1:
+#                 x = x.repeat(opt.smooth_samples, 1, 1, 1)
+#                 x = x + torch.randn_like(x) * opt.sigma_train
+
             model_output = model(x)
-            
-            if opt.smooth_samples != -1:
-                model_output = model_output.reshape(opt.smooth_samples, y.shape[0], model_output.shape[-1]).mean(dim=0)
-                
+
+#             if opt.smooth_samples != -1:
+#                 model_output = model_output.reshape(opt.smooth_samples, y.shape[0], model_output.shape[-1]).mean(dim=0)
+
             loss, acc = loss_fn(model_output, target=y,
                                 n_support=opt.num_support_tr)
             loss.backward()
@@ -137,6 +140,10 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
         avg_loss = np.mean(train_loss[-opt.iterations:])
         avg_acc = np.mean(train_acc[-opt.iterations:])
         print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
+        
+        writer.add_scalar('Avg train loss', avg_loss, epoch)
+        writer.add_scalar('Avg train acc', avg_acc, epoch)
+        
         lr_scheduler.step()
         if val_dataloader is None:
             continue
@@ -157,6 +164,10 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
         #wandb.log({'val acc': avg_acc, 'val loss': avg_loss})
         print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(
             avg_loss, avg_acc, postfix))
+        
+        writer.add_scalar('Avg val loss', avg_loss, epoch)
+        writer.add_scalar('Avg val acc', avg_acc, epoch)
+        
         if avg_acc >= best_acc:
             torch.save(model.state_dict(), best_model_path)
             best_acc = avg_acc
@@ -224,12 +235,17 @@ def main():
 
     if torch.cuda.is_available() and not options.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
-
+        
+        
+    writer = SummaryWriter('runs/protonet_training/{}shot_{}_sigma{}_iter{}'.format(options.num_support_tr,
+                                                                              options.dataset,
+                                                                              options.sigma,
+                                                                              options.iterations))
+    
     init_seed(options)
 
     tr_dataloader = init_dataloader(options, 'train')
     val_dataloader = init_dataloader(options, 'val')
-    # trainval_dataloader = init_dataloader(options, 'trainval')
     test_dataloader = init_dataloader(options, 'test')
 
     model = init_protonet(options)
@@ -240,7 +256,8 @@ def main():
                 val_dataloader=val_dataloader,
                 model=model,
                 optim=optim,
-                lr_scheduler=lr_scheduler)
+                lr_scheduler=lr_scheduler,
+                writer=writer)
     best_state, best_acc, train_loss, train_acc, val_loss, val_acc = res
     print('Testing with last model..')
     test(opt=options,
@@ -252,6 +269,8 @@ def main():
     test(opt=options,
          test_dataloader=test_dataloader,
          model=model)
+    
+    writer.close()
 
     # optim = init_optim(options, model)
     # lr_scheduler = init_lr_scheduler(options, optim)
