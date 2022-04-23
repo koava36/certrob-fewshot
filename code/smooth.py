@@ -35,79 +35,59 @@ class Smooth(object):
             return abs(deltas * self.sigma * np.sqrt(pi / 2))
         
     
-    def predict(self, args, x: torch.tensor, centroids: torch.tensor, centroid_classes: torch.tensor, show_bounds=False):
-        """Define predicted by smoothed model class and adversarial class on sample x"""
-        
+    def predict(self, args, x: torch.tensor, centroids: torch.tensor, centroid_classes: torch.tensor):
+        """Define predicted by smoothed model class and adversarial class on sample x
+           Speed-up version
         """
-        :return: (predicted class, adversarial class, predicted class centroid, adversarial class centroid) or ABSTAIN
+        """
+        :return: (predicted class, adversarial class, predicted class centroid, adversarial class centroid, n_samples) or ABSTAIN
         """
         
         alpha = args.alpha
-        m_values = args.M
         k_repeats = args.K
         n_samples = args.N
         batch_size = args.batch
-#         def s_realizations(a, N):
-#             coef = 1 / (N ** 2 - N)
-#             pair_prods = a @ torch.transpose(a, -2, -1)
-#             return coef * (torch.sum(pair_prods, axis=(-2, -1)) - torch.diagonal(pair_prods, dim1=-2, dim2=-1).sum(axis=-1))
         
-        def s_realizations(a, N):
-            step = 1000
-            coef = 1 / N ** 2
-            summ = 0
-            for i in range(0, N, step):
-                for j in range(N, 2 * N, step):
-                    summ += torch.sum(a[j:j+step] @ torch.transpose(a[i:i+step], 0, 1))
-            return summ * coef
+        get_mean_quadr = lambda a, b: torch.mean(a, axis=0) @ torch.mean(torch.transpose(b, 1, 0), axis=1)
+        get_mean_lin = lambda a: 2 * a @ torch.transpose(centroids, 1, 0)
 
         with torch.no_grad():
             
-            sampled_embeddings = torch.empty((1, 2 * n_samples, EMB_SIZE))
+            mean_quadr = 0
+            mean_lin = torch.zeros(self.num_classes, device=self.device)
+            classes_const = torch.diag(centroids @ torch.transpose(centroids, 1, 0), 0)
+            
             
             for k in range(k_repeats):
                 # sample 2n values of f(x + eps) for each of m realization
-                new_embeddings = self._sample_smoothed(x, m_values, 2 * n_samples, batch_size).cpu()
-                sampled_embeddings = torch.cat((sampled_embeddings, new_embeddings))
-                if k == 0:
-                    sampled_embeddings = sampled_embeddings[1:]
+                new_embeddings = self._sample_smoothed(x, 1, 2 * n_samples, batch_size)[0]
 
-                this_m_values = sampled_embeddings.shape[0]
+                #for each class, update coef * (<sumf(x+eps_i), sumf(x+eps_j)> and <sumf(x+eps_i)- c_k>
+                
+                #calculate conf bounds for mean <f(x+eps_i), f(x+eps_j)>
+                new_mean_quadr = get_mean_quadr(new_embeddings[:n_samples, :], new_embeddings[n_samples:2*n_samples, :])
 
-                s_estimates = torch.empty((1, this_m_values)).to(self.device)
-
-                #for each class, compute realizations of s_k = coef * sum(<f(x+eps_i) - c_k, f(x+eps_j) - c_k>)
-                for i in range(self.num_classes):
-                    dists = sampled_embeddings - centroids[i].cpu()
-
-                    s = []
-                    for j in range(this_m_values):
-                        s.append(s_realizations(dists[j].to(self.device), n_samples))
-                    s = torch.tensor(s, device=self.device)
-
-                    s_estimates = torch.cat((s_estimates, s.unsqueeze(0)))
-                s_estimates = s_estimates[1:]
+                #calculate conf bounds for <f(x+eps_i), c_k>
+                new_mean_lin = get_mean_lin(torch.mean(new_embeddings, dim=0)) # [num_classes]
+                
+                mean_quadr = (k * mean_quadr + new_mean_quadr) / (k + 1)
+                mean_lin = (k * mean_lin + new_mean_lin) / (k + 1)
+                    
 
                 #confidence intervals for means of s_k for all classes
-                conf_ints = self._confidence_intervals(s_estimates, alpha)
+                conf_ints_quadr = self._confidence_intervals(mean_quadr, (n_samples ** 2) * (k + 1), alpha, 4.)
+                conf_ints_lin = self._confidence_intervals(mean_lin, n_samples * (k + 1), alpha, 4.)
 
-                # for debugging
-#                 if show_bounds:
-#                     clear_output(True)
-#                     plt.figure(figsize=(18, 6))
-#                     for i in range(conf_ints.shape[1]):
-#                         plt.plot(conf_ints[:, i].cpu(), [0, 0], "o")
-#                         plt.text(conf_ints[0, i], -0.05, '({a:.5f}, {b:.5f})'.format(a=conf_ints[0, i], b=conf_ints[1, i]))
-#                     plt.xlim(conf_ints.cpu().min()-0.1, conf_ints.cpu().max()+0.1)
-#                     plt.title('iteration: {k}'.format(k=k))
-#                     plt.show()
+                index = torch.LongTensor([1, 0])
+                conf_ints = torch.sqrt(conf_ints_quadr - conf_ints_lin[index] + classes_const)
 
 
                 if self._robustness_condition(conf_ints):
-                    return centroid_classes[torch.argsort(conf_ints[1, ...])[:2]], centroids[torch.argsort(conf_ints[1, ...])[:2]]
+                    #print('dist to ptototypes: ', conf_ints)
+                    return centroid_classes[torch.argsort(conf_ints[1, ...])[:2]], centroids[torch.argsort(conf_ints[1, ...])[:2]], n_samples * (k+1)
             
+            #print('dist to ptototypes: ', conf_ints)
             return Smooth.ABSTAIN
-
         
     def _sample_smoothed(self, x: torch.tensor, m_values: int, n_samples: int, batch_size: int):
         """Sample values of g(x) Monte-Carlo estimation (without normalization)"""
@@ -166,17 +146,12 @@ class Smooth(object):
         return (0.5 * (norm_batch(y) - norm_batch(x)) - torch.diag(z @ torch.transpose(y - x, 0, 1))) / norm_batch(y - x) 
                
         
-    def _confidence_intervals(self, x: torch.tensor, alpha: float):
+    def _confidence_intervals(self, x_means: torch.tensor, n: int, alpha: float, bound_const: float):
         """
         Confidence interval on sample's mean using Hoeffding's inequality 
         """
-        x_means = x.mean(axis=1)
-        t = np.sqrt((- np.log(alpha / 2) / (x.shape[1]) / 8))
+        t = np.sqrt((- np.log(alpha / 2) / (((bound_const ** 2) / 2) * n)))
         square_conf_ints = x_means.repeat(2, 1) + torch.tensor([[-t], [+t]]).to(self.device)
-        square_conf_ints[square_conf_ints < 0] = 0                                                       
-        conf_ints = torch.sqrt(square_conf_ints)
-        
-        return conf_ints
 
 def divide_batch(batch, target, n_support):
     
