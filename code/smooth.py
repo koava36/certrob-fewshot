@@ -1,9 +1,13 @@
 import torch
 import numpy as np
+import kornia as K
 from math import ceil, pi
+from scipy.stats import norm
+from statsmodels.stats.proportion import proportion_confint
+import time
 
-#import matplotlib.pyplot as plt
-#from IPython.display import clear_output
+# import matplotlib.pyplot as plt
+# from IPython.display import clear_output
 
 EMB_SIZE = 512
 
@@ -12,32 +16,52 @@ class Smooth(object):
     # to abstain, Smooth returns this int
     ABSTAIN = -1.0
         
-    def __init__(self, base_model: torch.nn.Module, device: str, num_classes: int, sigma: float):
+    def __init__(self, base_model: torch.nn.Module, device: str, num_classes: int, sigma: float, alpha: float, mode: str):
         self.base_model = base_model
         self.num_classes = num_classes
         self.sigma = sigma
         self.device = device
-        
+        self.transform_mode = mode
+        self.alpha = alpha
     
+    
+    def embedding_risk_lcb(self, x: torch.tensor, true_centroid: torch.tensor, adv_centroid: torch.tensor):
+        n_samples = self.K * self.N
+        batch_size = 100
+        alpha = self.alpha
+
+        get_mean_quadr = lambda a, b: torch.mean(a, axis=0) @ torch.mean(torch.transpose(b, 1, 0), axis=1)
+        get_mean_lin = lambda a, c: a @ torch.transpose(c.unsqueeze(0), 1, 0)
+
+        with torch.no_grad():
+            new_embeddings = self._sample_smoothed(x, 1, n_samples, batch_size)[0]
+            centr_dist = 2 * torch.sum((true_centroid - adv_centroid) ** 2)
+            lin = get_mean_lin(torch.mean(new_embeddings, dim=0), true_centroid - adv_centroid)
+            conf_int = self._confidence_intervals(lin, n_samples, alpha, 4.)
+            lcb_gamma = conf_int[0] / centr_dist
+    
+
+            return lcb_gamma
+
+            
     def certified_radius(self, x: torch.tensor, true_centroid: torch.tensor, adv_centroid: torch.tensor):
-        """Certified radius in l2-norm for sample x"""
+        """Improved certified radius in l2-norm for sample x"""
         
         """
         :return: lower estimate of l2-norm of perturbation that doesn't change prediction on x
         """
+        n_samples = self.K * self.N
+        batch_size = 100
+        alpha = self.alpha
         
-        if len(true_centroid.shape) == 1:
-            delta = self._adversarial_emb(x, true_centroid, adv_centroid)
-            return abs(delta * self.sigma * np.sqrt(pi / 2))
-        
-        else:
-            deltas = self._adversarial_emb_batch(x, true_centroid, adv_centroid)
-            return abs(deltas * self.sigma * np.sqrt(pi / 2))
+        lcb_gamma = self.embedding_risk_lcb(x, true_centroid, adv_centroid) + 0.5
+            
+        return lcb_gamma, self.sigma * (norm.ppf(lcb_gamma.cpu()))
+
         
     
     def predict(self, args, x: torch.tensor, centroids: torch.tensor, centroid_classes: torch.tensor):
         """Define predicted by smoothed model class and adversarial class on sample x
-           Speed-up version
         """
         """
         :return: (predicted class, adversarial class, predicted class centroid, adversarial class centroid, n_samples) or ABSTAIN
@@ -46,6 +70,10 @@ class Smooth(object):
         alpha = args.alpha
         k_repeats = args.K
         n_samples = args.N
+        
+        self.K = args.K
+        self.N = args.N
+        
         batch_size = args.batch
         
         get_mean_quadr = lambda a, b: torch.mean(a, axis=0) @ torch.mean(torch.transpose(b, 1, 0), axis=1)
@@ -79,15 +107,15 @@ class Smooth(object):
                 conf_ints_lin = self._confidence_intervals(mean_lin, n_samples * (k + 1), alpha, 4.)
 
                 index = torch.LongTensor([1, 0])
+                
                 conf_ints = torch.sqrt(conf_ints_quadr - conf_ints_lin[index] + classes_const)
 
 
                 if self._robustness_condition(conf_ints):
-                    #print('dist to ptototypes: ', conf_ints)
                     return centroid_classes[torch.argsort(conf_ints[1, ...])[:2]], centroids[torch.argsort(conf_ints[1, ...])[:2]], n_samples * (k+1)
             
-            #print('dist to ptototypes: ', conf_ints)
             return Smooth.ABSTAIN
+            
         
     def _sample_smoothed(self, x: torch.tensor, m_values: int, n_samples: int, batch_size: int):
         """Sample values of g(x) Monte-Carlo estimation (without normalization)"""
@@ -95,7 +123,7 @@ class Smooth(object):
         """
         :return: tensor of size [m_values, emb_size]
         """
-        
+                   
         num = m_values * n_samples
         embeddings = torch.empty((1, EMB_SIZE)).to(self.device)
                                  
@@ -105,11 +133,22 @@ class Smooth(object):
                 num -= this_batch_size
 
                 batch = x.repeat((this_batch_size, 1, 1, 1))
-                noise = torch.randn_like(batch, device=self.device) * self.sigma
-                batch_emb = self.base_model(batch + noise).to(self.device)
+                if self.transform_mode == 'small-norm':
+                    noise = torch.randn_like(batch, device=self.device) * self.sigma
+                    batch_emb = self.base_model(batch+noise).to(self.device)  
+                    #batch_emb = self.base_model(batch).to(self.device)   
+                elif self.transform_mode == 'gamma':
+                    gammas = torch.exp(self.sigma * torch.randn(batch.shape[0], device=self.device))[:, None, None, None]
+                    batch_emb = self.base_model(torch.pow(batch, gammas)).to(self.device)
+                elif self.transform_mode == 'translate':
+                    img_size = batch.shape[-1]
+                    translation = torch.randn((batch.shape[0], 2), device=self.device) * self.sigma * img_size
+                    translated = k_transform.translate(batch, translation=translation, padding_mode='reflection')
+                    batch_emb = self.base_model(translated).to(self.device)
                 embeddings = torch.cat((embeddings, batch_emb))
 
             embeddings = embeddings[1:].reshape(m_values, n_samples, -1)
+            
             
         return embeddings
     
@@ -152,6 +191,19 @@ class Smooth(object):
         """
         t = np.sqrt((- np.log(alpha / 2) / (((bound_const ** 2) / 2) * n)))
         square_conf_ints = x_means.repeat(2, 1) + torch.tensor([[-t], [+t]]).to(self.device)
+        
+        return square_conf_ints
+    
+    def _lower_confidence_bound(self, NA: int, N: int, alpha: float) -> float:
+        """ Returns a (1 - alpha) lower confidence bound on a bernoulli proportion.
+        This function uses the Clopper-Pearson method.
+        :param NA: the number of "successes"
+        :param N: the number of total draws
+        :param alpha: the confidence level
+        :return: a lower bound on the binomial proportion which holds true w.p at least (1 - alpha) over the samples
+        """
+        return proportion_confint(NA, N, alpha=2 * alpha, method="beta")[0]
+    
 
 def divide_batch(batch, target, n_support):
     
@@ -172,6 +224,25 @@ def divide_batch(batch, target, n_support):
     query_target = target[query_idxs]
     
     return support_samples, support_target, query_samples, query_target
+
+def euclidean_dist(x, y):
+    '''
+    Compute euclidean distance between two tensors
+    '''
+    # x: N x D
+    # y: M x D
+    n = x.size(0)
+    m = y.size(0)
+    d = x.size(1)
+    if d != y.size(1):
+        raise Exception
+
+    x = x.unsqueeze(1).expand(n, m, d)
+    y = y.unsqueeze(0).expand(n, m, d)
+
+    return torch.pow(x - y, 2).sum(2)
+
+
 
 
 

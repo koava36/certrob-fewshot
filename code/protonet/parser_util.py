@@ -24,6 +24,16 @@ def get_parser():
                         type=str,
                         help='root where to store models, losses and accuracies',
                         default='..' + os.sep + 'output')
+    
+    parser.add_argument('--aug',
+                        type=str,
+                        help="augmentation type",
+                        default='gauss')
+    
+    parser.add_argument('--resume',
+                        type=bool,
+                        help="resume training",
+                        default=False)
 
     parser.add_argument('-nep', '--epochs',
                         type=int,
@@ -83,7 +93,7 @@ def get_parser():
     parser.add_argument('-nqVa', '--num_query_val',
                         type=int,
                         help='number of samples per class to use as query for validation, default=15',
-                        default=15)
+                        default=5)
 
     parser.add_argument('-seed', '--manual_seed',
                         type=int,

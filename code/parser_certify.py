@@ -23,9 +23,9 @@ def get_parser():
                         type=str,
                         help="path to saved pytorch model of base classifier")
     
-    parser.add_argument("outfile",
+    parser.add_argument("outdir",
                         type=str,
-                        help="output file for experiment data")
+                        help="output directory for experiment data")
     
     parser.add_argument("num_support_val",
                         type=int,
@@ -91,9 +91,9 @@ def get_parser():
                         help="failure probability")
 
     parser.add_argument('-imsize', '--orig_imsize',
-                    type=int,
-                    default=-1,
-                    help='-1 for no cache, and -2 for no resize, only for MiniImageNet')
+                        type=int,
+                        default=-1,
+                        help='-1 for no cache, and -2 for no resize, only for MiniImageNet')
         
     parser.add_argument("--cuda",
                         default=True)
@@ -106,6 +106,15 @@ def get_parser():
                         type=int,
                         default=7,
                         help='input for the manual seeds initializations')
+    
+    parser.add_argument("--mode",
+                        type=str,
+                        default='small-norm')
+    
+    parser.add_argument("--descr",
+                        type=str,
+                        default=None,
+                        help="additional description for output filename")
     
 
     return parser

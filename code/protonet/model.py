@@ -38,6 +38,7 @@ class ProtoNetEmbedding(nn.Module):
           ConvBlock(h_dim, z_dim, retain_activation=retain_last_activation, activation=activation),
         )
         self.fc = nn.Linear(1600, 512)
+
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -45,12 +46,17 @@ class ProtoNetEmbedding(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+        
                 
         self.normalize = normalize
+        
 
     def forward(self, x):
         x = self.encoder(x)
         if self.normalize:
-            return nn.functional.normalize(self.fc(x.view(x.size(0), -1)), p=2.0, dim=1)
+            if self.fc:
+                return nn.functional.normalize(self.fc(x.view(x.size(0), -1)), p=2.0, dim=1)
+            else:
+                return nn.functional.normalize(x.view(x.size(0), -1), p=2.0, dim=1)
         else:
             return self.fc(x.view(x.size(0), -1))

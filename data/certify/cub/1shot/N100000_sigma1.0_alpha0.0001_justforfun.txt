@@ -1,0 +1,2 @@
+label	predict	gamma LCB	radius	time	N samples
+9	9	0.558	0.1459	0:00:00.075107	1000

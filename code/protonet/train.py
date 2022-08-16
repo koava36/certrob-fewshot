@@ -67,7 +67,8 @@ def init_protonet(opt):
     '''
     Initialize the ProtoNet
     '''
-    device = 'cuda:{n}'.format(n=opt.cuda_number) if torch.cuda.is_available() and opt.cuda else 'cpu'
+    device = 'cuda:{n}'.format(n=opt.cuda_number) if (opt.cuda and torch.cuda.is_available()) else 'cpu'
+    print(device)
     model = ProtoNetEmbedding().to(device)
     return model
 
@@ -237,10 +238,12 @@ def main():
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         
         
-    writer = SummaryWriter('runs/protonet_training/{}shot_{}_sigma{}_iter{}'.format(options.num_support_tr,
+    writer = SummaryWriter('runs/resnet/{}shot_{}_aug_{}_sigma{}_iter{}'.format(options.num_support_tr,
                                                                               options.dataset,
+                                                                              options.aug,
                                                                               options.sigma,
                                                                               options.iterations))
+                                                                            
     
     init_seed(options)
 
@@ -251,6 +254,15 @@ def main():
     model = init_protonet(options)
     optim = init_optim(options, model)
     lr_scheduler = init_lr_scheduler(options, optim)
+    
+    device = 'cuda:{n}'.format(n=options.cuda_number) if torch.cuda.is_available() and options.cuda else 'cpu'
+    
+    if options.resume and os.path.exists(os.path.join(options.experiment_root, 'best_model.pth')):
+        print('Loading weights')
+        best_state = torch.load(os.path.join(options.experiment_root, 'best_model.pth'))
+        model.load_state_dict(best_state)
+        model.to(device)
+    
     res = train(opt=options,
                 tr_dataloader=tr_dataloader,
                 val_dataloader=val_dataloader,
