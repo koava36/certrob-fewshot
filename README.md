@@ -7,7 +7,7 @@ For experimental evaluation several ProtoNet models were trained on CUB200-2011,
 cd code
 python protonet/train.py --dataset DATASET --dataset_root PATH_TO_IMAGES --splits_root PATH_TO_SPLITS --experiment_root PATH_TO_CHECKPOINT  --classes_per_it_tr CL_PI_TR --iterations IT --num_support_tr N_SUP_TR --num_support_val N_SUP_VAL --num_query_tr N_QUE_TR --epochs N_EPOCHS --cuda
 ```
-<strong>cOptions:sh</strong>
+<strong>Options:</strong>
 - DATASET: either 'cub200', 'cifar-fs' or 'mini-imagenet'
 - PATH_TO_IMAGES: path to the folder, containing images
 - PATH_TO_SPLITS: path to the folder, containing splits to classes in either .txt or .csv format
